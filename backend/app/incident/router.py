@@ -123,3 +123,25 @@ def get_screenshot(
         media_type="image/jpeg",
         filename=f"incident_{incident_id}.jpg",
     )
+
+
+@router.get("/{incident_id}/report")
+def get_report(
+    incident_id: int,
+    service: IncidentService = Depends(_get_service),
+):
+    """Generate and stream a PDF audit report for a specific incident."""
+    from fastapi.responses import StreamingResponse
+    import io
+    from app.incident.report_generator import generate_incident_pdf
+
+    incident = service.get_incident(incident_id)
+    pdf_bytes = generate_incident_pdf(incident)
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=incident_report_{incident_id}.pdf"
+        }
+    )

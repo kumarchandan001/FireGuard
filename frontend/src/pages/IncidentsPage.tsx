@@ -293,6 +293,7 @@ const IncidentsPage = memo(function IncidentsPage() {
                     <th style={{ padding: '12px 12px', textAlign: 'right' }}>Confidence</th>
                     <th style={{ padding: '12px 12px' }}>Status</th>
                     <th style={{ padding: '12px 12px' }}>Assigned</th>
+                    <th style={{ padding: '12px 12px', width: '50px', textAlign: 'center' }}>Report</th>
                   </tr>
                 </thead>
                 <tbody style={{ fontFamily: 'var(--font-sans)', fontSize: '13px', color: 'var(--text-primary)' }}>
@@ -356,6 +357,38 @@ const IncidentsPage = memo(function IncidentsPage() {
                         </td>
                         <td style={{ padding: '12px 12px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-secondary)' }}>
                           {inc.status === 'resolved' ? 'Auto' : inc.status === 'acknowledged' ? 'OP-7721' : 'System'}
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                          <a
+                            href={apiClient.getResourceUrl(`/incidents/${inc.id}/report`)}
+                            download
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: 'var(--radius-sm)',
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              color: 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              transition: 'all var(--transition-fast)',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = 'var(--accent)';
+                              e.currentTarget.style.background = 'rgba(0, 198, 255, 0.1)';
+                              e.currentTarget.style.borderColor = 'rgba(0, 198, 255, 0.3)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = 'var(--text-secondary)';
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                            }}
+                            title="Download PDF Report"
+                          >
+                            <Download size={11} />
+                          </a>
                         </td>
                       </tr>
                     );
@@ -478,14 +511,50 @@ const IncidentsPage = memo(function IncidentsPage() {
                   minHeight: 0,
                 }}
               >
-                <div style={{ padding: '12px', borderBottom: '1px solid #363942', background: '#1a1c24' }}>
-                  <h4 style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--danger)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Alert Details</h4>
-                  <p style={{ margin: '6px 0 0 0', fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {DETECTION_TYPE_LABELS[selectedIncident.detection_type] || selectedIncident.detection_type} Threat Spike Detected
-                  </p>
-                  <p style={{ margin: '4px 0 0 0', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-secondary)' }}>
-                    ID: ALR-20260708-{selectedIncident.id}
-                  </p>
+                <div style={{ padding: '12px', borderBottom: '1px solid #363942', background: '#1a1c24', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--danger)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Alert Details</h4>
+                    <p style={{ margin: '6px 0 0 0', fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {DETECTION_TYPE_LABELS[selectedIncident.detection_type] || selectedIncident.detection_type} Threat Spike Detected
+                    </p>
+                    <p style={{ margin: '4px 0 0 0', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-secondary)' }}>
+                      ID: ALR-20260708-{selectedIncident.id}
+                    </p>
+                  </div>
+                  <a
+                    href={apiClient.getResourceUrl(`/incidents/${selectedIncident.id}/report`)}
+                    download
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '5px 10px',
+                      background: 'rgba(0, 198, 255, 0.1)',
+                      border: '1px solid rgba(0, 198, 255, 0.2)',
+                      borderRadius: 'var(--radius-sm)',
+                      color: 'var(--accent)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '9px',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                      cursor: 'pointer',
+                      transition: 'all var(--transition-fast)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = '#fff';
+                      e.currentTarget.style.background = 'var(--accent)';
+                      e.currentTarget.style.borderColor = 'var(--accent)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = 'var(--accent)';
+                      e.currentTarget.style.background = 'rgba(0, 198, 255, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(0, 198, 255, 0.2)';
+                    }}
+                    title="Download PDF Incident Report"
+                  >
+                    <Download size={10} />
+                    <span>PDF REPORT</span>
+                  </a>
                 </div>
 
                 <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto' }}>
