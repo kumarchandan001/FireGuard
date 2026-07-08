@@ -31,6 +31,7 @@ export default function VideoFeed({
 }: VideoFeedProps) {
   const [toggling, setToggling] = useState(false);
   const [time, setTime] = useState(new Date());
+  const [thermalActive, setThermalActive] = useState(false);
   const hasDetections = detections.length > 0;
   const showActions = alarmStatus && alarmStatus.state !== 'idle';
   const isAlarmActive = alarmStatus?.state === 'active' || alarmStatus?.state === 'triggered';
@@ -78,12 +79,38 @@ export default function VideoFeed({
         boxShadow: frame ? 'inset 0 0 60px rgba(0, 0, 0, 0.3)' : 'none',
       }}
     >
+      {/* SVG Thermal vision hardware-accelerated color-matrix lookup table filter */}
+      <svg style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none' }} aria-hidden="true">
+        <filter id="thermal-vision">
+          <feColorMatrix
+            type="matrix"
+            values="0.2126 0.7152 0.0722 0 0
+                    0.2126 0.7152 0.0722 0 0
+                    0.2126 0.7152 0.0722 0 0
+                    0 0 0 1 0"
+            result="gray"
+          />
+          <feComponentTransfer in="gray">
+            <feFuncR type="table" tableValues="0.0 0.1 0.7 1.0 1.0 1.0" />
+            <feFuncG type="table" tableValues="0.0 0.0 0.0 0.4 0.9 1.0" />
+            <feFuncB type="table" tableValues="0.3 0.6 0.8 0.0 0.0 0.9" />
+          </feComponentTransfer>
+        </filter>
+      </svg>
+
       {/* Video Frame or No Signal */}
       {frame ? (
         <img
           src={`data:image/jpeg;base64,${frame}`}
           alt="Live camera feed"
-          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            display: 'block',
+            filter: thermalActive ? 'url(#thermal-vision) contrast(1.3) saturate(1.5)' : 'none',
+            transition: 'filter 0.3s ease',
+          }}
         />
       ) : (
         <NoSignal cameraOnline={cameraOnline} onStart={handleStart} toggling={toggling} />
@@ -145,9 +172,22 @@ export default function VideoFeed({
             {cameraOnline ? 'LIVE' : 'OFFLINE'}
           </span>
           {cameraOnline && (
-            <button onClick={handleStop} disabled={toggling} style={stopBtnStyle}>
-              ■ STOP
-            </button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={handleStop} disabled={toggling} style={stopBtnStyle}>
+                ■ STOP
+              </button>
+              <button
+                onClick={() => setThermalActive(!thermalActive)}
+                style={{
+                  ...stopBtnStyle,
+                  color: thermalActive ? '#10b981' : 'var(--accent)',
+                  background: thermalActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0, 198, 255, 0.1)',
+                  border: thermalActive ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(0, 198, 255, 0.2)',
+                }}
+              >
+                {thermalActive ? '🌡️ NORMAL VISION' : '🌡️ THERMAL VISION'}
+              </button>
+            </div>
           )}
         </div>
 
