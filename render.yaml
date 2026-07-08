@@ -23,14 +23,6 @@ services:
         value: sqlite:///data/fireguard.db
       - key: FIREGUARD_SCREENSHOT_DIR
         value: /app/data/screenshots
-    # Persistent Disk (SQLite storage & Screenshots)
-    # NOTE: Render Disks require a paid tier (Starter or higher).
-    # If deploying on the Free tier, comment out or remove the 'disk' block below.
-    # (Without a disk, your SQLite database and screenshots will reset on redeployment).
-    disk:
-      name: fireguard-data
-      mountPath: /app/data
-      sizeGB: 1
 
   # ──────────────────────────────────────────────
   # 2. Frontend Static Site (React + Vite)
