@@ -74,10 +74,11 @@ class AlarmService:
         incident_id = event.data.get("incident_id", 0)
         detection_type = event.data.get("detection_type", "unknown")
         confidence = event.data.get("confidence", 0.0)
+        device_id = event.data.get("device_id", "CAM_01")
 
         if self._state_machine.state == AlarmState.IDLE:
             # Trigger the alarm
-            triggered = self._state_machine.trigger(incident_id, detection_type, confidence)
+            triggered = self._state_machine.trigger(incident_id, detection_type, confidence, device_id)
             if triggered:
                 await self._broadcast_alarm_state()
                 # Auto-confirm after delay
@@ -173,7 +174,7 @@ class AlarmService:
                 db.close()
 
             # Trigger, activate, and mark dispatched
-            self._state_machine.trigger(incident_id, "manual_panic", 1.0)
+            self._state_machine.trigger(incident_id, "manual_panic", 1.0, "MANUAL_PANIC")
             self._state_machine.activate()
             self._state_machine.dispatch()
             await self._broadcast_alarm_state()

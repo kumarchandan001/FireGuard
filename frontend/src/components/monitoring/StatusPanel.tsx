@@ -22,11 +22,12 @@ export default function StatusPanel({
   aiConfidence,
 }: StatusPanelProps) {
   const [tempTrend, setTempTrend] = useState<string>('M0,25 L10,22 L20,24 L30,20 L40,21 L50,15 L60,18 L70,12 L80,14 L90,8 L100,10');
+  const [selectedSector, setSelectedSector] = useState<string>('CAM_01');
   const isAlert = alarmState === 'triggered' || alarmState === 'active';
 
   const handleTriggerSimulation = async (type: 'fire' | 'smoke') => {
     try {
-      await apiClient.post(`/alarm/test-trigger?detection_type=${type}`);
+      await apiClient.post(`/alarm/test-trigger?detection_type=${type}&device_id=${selectedSector}`);
     } catch {
       alert('Failed to trigger simulation.');
     }
@@ -408,6 +409,31 @@ export default function StatusPanel({
           >
             Threat Simulator
           </span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+          <label style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+            TARGET SECTOR ZONE
+          </label>
+          <select
+            value={selectedSector}
+            onChange={(e) => setSelectedSector(e.target.value)}
+            style={{
+              backgroundColor: '#11151c',
+              border: '1px solid #363942',
+              color: '#fff',
+              fontSize: '11px',
+              padding: '6px 8px',
+              borderRadius: 'var(--radius-sm)',
+              outline: 'none',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            <option value="CAM_01">North Server Room (CAM 01)</option>
+            <option value="CAM_04">East Lab Corridor (CAM 04)</option>
+            <option value="CAM_08">South Lobby Array (CAM 08)</option>
+            <option value="CAM_12">West Loading Gate (CAM 12)</option>
+          </select>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
           <button

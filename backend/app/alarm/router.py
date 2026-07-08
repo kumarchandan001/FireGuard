@@ -59,6 +59,7 @@ async def dismiss_alarm() -> dict:
 async def test_trigger(
     detection_type: str = "fire",
     confidence: float = 0.92,
+    device_id: str = "CAM_01",
 ) -> dict:
     """Manually trigger a simulated detection for testing."""
     if _alarm_service is None:
@@ -92,6 +93,7 @@ async def test_trigger(
         data={
             "detection_type": detection_type,
             "confidence": confidence,
+            "device_id": device_id,
             "detections": [
                 {
                     "class_name": detection_type,

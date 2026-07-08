@@ -7,10 +7,11 @@
  *   - Right: TerminalLog (Websocket state & simulated diagnostic log lines)
  */
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import VideoFeed from '../components/monitoring/VideoFeed';
 import StatusPanel from '../components/monitoring/StatusPanel';
 import TerminalLog from '../components/monitoring/TerminalLog';
+import EvacuationMap from '../components/monitoring/EvacuationMap';
 import { useAppContext } from '../components/layout/MainLayout';
 import { useApi } from '../hooks/useApi';
 import { apiClient } from '../api/client';
@@ -23,6 +24,7 @@ interface IncidentSummary {
 
 export default function MonitoringPage() {
   const { ws, systemState, cameraOnline, aiReady } = useAppContext();
+  const [activeTab, setActiveTab] = useState<'surveillance' | 'evacuation'>('surveillance');
 
   const { data: summary } = useApi<IncidentSummary>('/incidents/summary', { pollInterval: 10000 });
   const { data: recentIncidents } = useApi<Incident[]>('/incidents/recent?limit=10', { pollInterval: 10000 });
@@ -57,91 +59,144 @@ export default function MonitoringPage() {
         />
       </div>
 
-      {/* Center Column — Live Grid Surveillance */}
+      {/* Center Column — Live Grid & Evacuation */}
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-        {/* Matrix Header info */}
+        {/* Tab Selection Header */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginBottom: '8px',
+            marginBottom: '12px',
+            borderBottom: '1px solid var(--border-color)',
+            paddingBottom: '4px',
             flexShrink: 0,
           }}
         >
-          <span
-            style={{
-              fontFamily: 'var(--font-sans)',
-              fontSize: '12px',
-              fontWeight: 700,
-              color: 'var(--text-primary)',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-            }}
-          >
-            Live Surveillance Matrix
-          </span>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <button
+              onClick={() => setActiveTab('surveillance')}
+              style={{
+                background: 'none',
+                border: 'none',
+                borderBottom: activeTab === 'surveillance' ? '2px solid var(--accent)' : '2px solid transparent',
+                color: activeTab === 'surveillance' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                padding: '6px 4px',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                transition: 'all 0.3s ease',
+              }}
+            >
+              🎥 Surveillance Matrix
+            </button>
+            <button
+              onClick={() => setActiveTab('evacuation')}
+              style={{
+                background: 'none',
+                border: 'none',
+                borderBottom: activeTab === 'evacuation' ? '2px solid var(--accent)' : '2px solid transparent',
+                color: activeTab === 'evacuation' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                padding: '6px 4px',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                transition: 'all 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              🗺️ Evacuation Wayfinding
+              {isAlert && (
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    backgroundColor: '#ef4444',
+                    borderRadius: '50%',
+                    display: 'inline-block',
+                    animation: 'pulse-text 1.2s infinite',
+                  }}
+                />
+              )}
+            </button>
+          </div>
           <span
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: '10px',
-              color: 'var(--text-secondary)',
+              color: 'var(--text-muted)',
             }}
           >
-            Sectors Scanned: 4 / 4
+            {activeTab === 'surveillance' ? 'Sectors Scanned: 4 / 4' : 'Escape Exits: 3 Active'}
           </span>
         </div>
 
-        {/* 2x2 Camera Grid */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gridTemplateRows: '1fr 1fr',
-            gap: '8px',
-            flex: 1,
-            minHeight: 0,
-          }}
-        >
-          {/* CAM 01: Actual Live feed */}
-          <div style={{ position: 'relative', overflow: 'hidden' }}>
-            <VideoFeed
-              frame={ws.latestFrame}
-              fps={ws.fps}
-              detections={ws.detections}
-              cameraOnline={cameraOnline}
-              isAlert={isAlert}
-              alarmStatus={ws.alarmStatus}
-              onAcknowledge={handleAcknowledge}
-              onDismiss={handleDismiss}
+        {/* Tab Content Panels */}
+        {activeTab === 'surveillance' ? (
+          /* 2x2 Camera Grid */
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gridTemplateRows: '1fr 1fr',
+              gap: '8px',
+              flex: 1,
+              minHeight: 0,
+            }}
+          >
+            {/* CAM 01: Actual Live feed */}
+            <div style={{ position: 'relative', overflow: 'hidden' }}>
+              <VideoFeed
+                frame={ws.latestFrame}
+                fps={ws.fps}
+                detections={ws.detections}
+                cameraOnline={cameraOnline}
+                isAlert={isAlert}
+                alarmStatus={ws.alarmStatus}
+                onAcknowledge={handleAcknowledge}
+                onDismiss={handleDismiss}
+              />
+            </div>
+
+            {/* CAM 04: Mock Hallway */}
+            <MockCamera
+              id="CAM_04"
+              name="EXT_NORTH"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjWcIqO4mey06Ho51VLWHxje1LvfAqyAf5vld_YD878cJFCi-W57SYEsQQGtWfkGE31MKLMMiQCGwYaH3OCZgyUqgdKXBBrQFwAwuocGG7sPKKTY4DG0x3BjWXRhcY2Mu2QmwhY9iCTTNAK2RSJxwLQ001GzmjQ7O69amwXWY-s18f6HXM4UwtERjTMBBsT59kFyNxoVOmzOXebJnBMFvgJGnmAQLPiPH8tcYlbrNfy1bVPfoAdLuB"
+              aiStatus="AI: CLEAR"
+            />
+
+            {/* CAM 08: Mock Warehouse */}
+            <MockCamera
+              id="CAM_08"
+              name="WAREHOUSE_B"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZuoMndZlBtj2OsqGEgoUmVBO0i5YiQrZWyeTFKj6slOHjPRFR3owAx4Gm9qzxv7olbd_5OWQpn3lj-I4cD-qg4jA4xyicKs055rs1r4thxrXY3P98_mdxoeLE8S216N8ktchek8GM9jhQs05Kqnfl89mw2QHp8fF0AGm2TtjBgzn9hZbFMotOg6jA1iHfN-OOv-5n_gDE0i9D5i_JrWgutTa9btAmNaRCSt2vvWDdK1EhJb_wsnsX"
+              aiStatus="FORKLIFT 98%"
+              hasDetectionBox
+            />
+
+            {/* CAM 12: Mock Stairwell */}
+            <MockCamera
+              id="CAM_12"
+              name="STAIR_03"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-UGy-uqYLsJMcfxLjVllF_4ctkQT3729W3vMsGLh_Aixjz_WLiO-HN0h1gPaFTVd9Nf6cd6vCBefd7WMl2LjGDJiY8vNz5SD5ZoLUu3z87cBHKaq66xUIpXMGUNAdjByA1kAGbWEx_kurIGdFsOqdHAodGFz8lO60gP403qfHu4bMEw-d2Pms-45RPSJaKiHSSTOUq91Eyd9f8VUH9yha0G-_9kwqNjWHi8vpxHICVAGpZmiv6FBs"
+              aiStatus="AI: CLEAR"
             />
           </div>
-
-          {/* CAM 04: Mock Hallway */}
-          <MockCamera
-            id="CAM_04"
-            name="EXT_NORTH"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjWcIqO4mey06Ho51VLWHxje1LvfAqyAf5vld_YD878cJFCi-W57SYEsQQGtWfkGE31MKLMMiQCGwYaH3OCZgyUqgdKXBBrQFwAwuocGG7sPKKTY4DG0x3BjWXRhcY2Mu2QmwhY9iCTTNAK2RSJxwLQ001GzmjQ7O69amwXWY-s18f6HXM4UwtERjTMBBsT59kFyNxoVOmzOXebJnBMFvgJGnmAQLPiPH8tcYlbrNfy1bVPfoAdLuB"
-            aiStatus="AI: CLEAR"
-          />
-
-          {/* CAM 08: Mock Warehouse */}
-          <MockCamera
-            id="CAM_08"
-            name="WAREHOUSE_B"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZuoMndZlBtj2OsqGEgoUmVBO0i5YiQrZWyeTFKj6slOHjPRFR3owAx4Gm9qzxv7olbd_5OWQpn3lj-I4cD-qg4jA4xyicKs055rs1r4thxrXY3P98_mdxoeLE8S216N8ktchek8GM9jhQs05Kqnfl89mw2QHp8fF0AGm2TtjBgzn9hZbFMotOg6jA1iHfN-OOv-5n_gDE0i9D5i_JrWgutTa9btAmNaRCSt2vvWDdK1EhJb_wsnsX"
-            aiStatus="FORKLIFT 98%"
-            hasDetectionBox
-          />
-
-          {/* CAM 12: Mock Stairwell */}
-          <MockCamera
-            id="CAM_12"
-            name="STAIR_03"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-UGy-uqYLsJMcfxLjVllF_4ctkQT3729W3vMsGLh_Aixjz_WLiO-HN0h1gPaFTVd9Nf6cd6vCBefd7WMl2LjGDJiY8vNz5SD5ZoLUu3z87cBHKaq66xUIpXMGUNAdjByA1kAGbWEx_kurIGdFsOqdHAodGFz8lO60gP403qfHu4bMEw-d2Pms-45RPSJaKiHSSTOUq91Eyd9f8VUH9yha0G-_9kwqNjWHi8vpxHICVAGpZmiv6FBs"
-            aiStatus="AI: CLEAR"
-          />
-        </div>
+        ) : (
+          /* Evacuation Route Planner */
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <EvacuationMap alarmStatus={ws.alarmStatus} />
+          </div>
+        )}
       </div>
 
       {/* Right Column — Operations Terminal log */}

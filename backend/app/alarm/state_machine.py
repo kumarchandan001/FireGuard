@@ -42,6 +42,7 @@ class AlarmStateMachine:
         self._current_incident_id: int | None = None
         self._detection_type: str | None = None
         self._confidence: float | None = None
+        self._device_id: str | None = None
         self._dispatched = False
 
     @property
@@ -61,10 +62,14 @@ class AlarmStateMachine:
         return self._confidence
 
     @property
+    def device_id(self) -> str | None:
+        return self._device_id
+
+    @property
     def is_active(self) -> bool:
         return self._state in (AlarmState.TRIGGERED, AlarmState.ACTIVE)
 
-    def trigger(self, incident_id: int, detection_type: str, confidence: float) -> bool:
+    def trigger(self, incident_id: int, detection_type: str, confidence: float, device_id: str | None = None) -> bool:
         """Transition to TRIGGERED state. Returns True if transition was valid."""
         if not self._can_transition(AlarmState.TRIGGERED):
             return False
@@ -73,9 +78,10 @@ class AlarmStateMachine:
         self._current_incident_id = incident_id
         self._detection_type = detection_type
         self._confidence = confidence
+        self._device_id = device_id
         self._dispatched = False
-        logger.info("Alarm TRIGGERED: incident=%d, type=%s, confidence=%.1f%%",
-                     incident_id, detection_type, confidence * 100)
+        logger.info("Alarm TRIGGERED: incident=%d, type=%s, confidence=%.1f%%, device=%s",
+                     incident_id, detection_type, confidence * 100, device_id)
         return True
 
     def activate(self) -> bool:
@@ -105,6 +111,7 @@ class AlarmStateMachine:
         self._current_incident_id = None
         self._detection_type = None
         self._confidence = None
+        self._device_id = None
         self._dispatched = False
         logger.info("Alarm DISMISSED → IDLE")
         return True
@@ -115,6 +122,7 @@ class AlarmStateMachine:
         self._current_incident_id = None
         self._detection_type = None
         self._confidence = None
+        self._device_id = None
         self._dispatched = False
 
     def dispatch(self) -> bool:
@@ -131,6 +139,7 @@ class AlarmStateMachine:
             "incident_id": self._current_incident_id,
             "detection_type": self._detection_type,
             "confidence": self._confidence,
+            "device_id": self._device_id,
             "dispatched": self._dispatched,
         }
 

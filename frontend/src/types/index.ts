@@ -32,6 +32,7 @@ export interface AlarmStatus {
   incident_id?: number;
   detection_type?: DetectionType;
   confidence?: number;
+  device_id?: string | null;
   dispatched?: boolean;
 }
 
