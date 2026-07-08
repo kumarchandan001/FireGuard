@@ -17,12 +17,27 @@ import app.incident.models  # noqa: F401
 import app.settings.models  # noqa: F401
 import app.alarm.models  # noqa: F401
 
+import os
+from pathlib import Path
+
 # Alembic Config object
 config = context.config
 
 # Setup logging from alembic.ini
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Override database URL with environment variable if present
+db_url = os.environ.get("FIREGUARD_DATABASE_URL")
+if db_url:
+    config.set_main_option("sqlalchemy.url", db_url)
+else:
+    db_url = config.get_main_option("sqlalchemy.url")
+
+# Ensure the database parent directory exists for SQLite database connections
+if db_url and db_url.startswith("sqlite"):
+    db_path = db_url.replace("sqlite:///", "")
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
 # Target metadata for auto-generation
 target_metadata = Base.metadata
