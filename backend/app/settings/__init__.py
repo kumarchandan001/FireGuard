@@ -1,0 +1,1 @@
+"""FireGuard AI — Settings Module"""

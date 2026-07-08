@@ -1,0 +1,47 @@
+# ──────────────────────────────────────────────
+# FireGuard AI — Docker Compose
+#
+# Usage:
+#   docker compose up --build        (first run)
+#   docker compose up -d             (detached)
+#   docker compose down              (stop)
+#   docker compose logs -f backend   (tail logs)
+# ──────────────────────────────────────────────
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fireguard-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend-data:/app/data
+      - ./backend/models:/app/models
+    environment:
+      - FIREGUARD_ENV=production
+      - FIREGUARD_DATABASE_URL=sqlite:///data/fireguard.db
+      - FIREGUARD_SCREENSHOT_DIR=/app/data/screenshots
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; r = httpx.get('http://localhost:8000/api/v1/health'); exit(0 if r.status_code == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fireguard-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  backend-data:
+    driver: local
