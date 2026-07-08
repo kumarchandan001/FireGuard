@@ -14,8 +14,8 @@ services:
     name: fireguard-backend
     env: python
     rootDir: backend
-    buildCommand: pip install -r requirements.txt && alembic upgrade head
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r requirements.txt
+    startCommand: python deploy_tasks.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: FIREGUARD_ENV
         value: production
