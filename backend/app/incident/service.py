@@ -97,6 +97,16 @@ class IncidentService(BaseService):
             except Exception:
                 logger.exception("Failed to save screenshot for incident #%d", incident.id)
 
+        # Log screenshot capture timeline event
+        from app.incident.models import IncidentReplayEvent
+        screenshot_event = IncidentReplayEvent(
+            incident_id=incident.id,
+            event_type="screenshot_captured",
+            description="Incident screenshot captured and archived",
+            timestamp=now
+        )
+        self._session.add(screenshot_event)
+
         self._repo.commit()
         return incident
 
@@ -137,6 +147,17 @@ class IncidentService(BaseService):
         incident.status = "acknowledged"
         incident.acknowledged_at = utc_now()
         self._repo.update(incident)
+
+        # Log timeline event
+        from app.incident.models import IncidentReplayEvent
+        ack_event = IncidentReplayEvent(
+            incident_id=incident.id,
+            event_type="operator_acknowledgment",
+            description="Incident acknowledged by Operator.",
+            timestamp=incident.acknowledged_at
+        )
+        self._session.add(ack_event)
+
         self._repo.commit()
         return incident
 
@@ -152,6 +173,17 @@ class IncidentService(BaseService):
         if note:
             incident.resolution_note = note
         self._repo.update(incident)
+
+        # Log timeline event
+        from app.incident.models import IncidentReplayEvent
+        res_event = IncidentReplayEvent(
+            incident_id=incident.id,
+            event_type="incident_resolved",
+            description=f"Incident resolved by Operator. Resolution notes: {note or 'None'}",
+            timestamp=incident.resolved_at
+        )
+        self._session.add(res_event)
+
         self._repo.commit()
         return incident
 
@@ -162,3 +194,72 @@ class IncidentService(BaseService):
     def count_by_status(self) -> dict[str, int]:
         """Get incident counts by status."""
         return self._repo.count_by_status()
+
+    def update_operator_decision(
+        self, incident_id: int, decision: str, note: str | None = None
+    ) -> Incident:
+        """
+        Update the operator decision and transition incident lifecycle status.
+        
+        Decisions:
+            confirmed   → Acknowledge (status='acknowledged')
+            false_alarm → Resolve (status='resolved', prepend '[FALSE ALARM]')
+            resolved    → Resolve (status='resolved')
+        """
+        incident = self.get_incident(incident_id)
+
+        if decision not in ("confirmed", "false_alarm", "resolved"):
+            raise ValueError(f"Invalid operator decision: {decision}")
+
+        incident.operator_decision = decision
+        
+        # Save note if provided
+        if note is not None:
+            incident.resolution_note = note
+
+        if decision == "confirmed":
+            if incident.status in ("detected", "active"):
+                incident.status = "acknowledged"
+                incident.acknowledged_at = utc_now()
+                
+                from app.incident.models import IncidentReplayEvent
+                ack_event = IncidentReplayEvent(
+                    incident_id=incident.id,
+                    event_type="operator_acknowledgment",
+                    description=f"Incident confirmed/acknowledged. Action notes: {note or 'None'}",
+                    timestamp=incident.acknowledged_at
+                )
+                self._session.add(ack_event)
+        elif decision in ("false_alarm", "resolved"):
+            if incident.status != "resolved":
+                incident.status = "resolved"
+                incident.resolved_at = utc_now()
+                if decision == "false_alarm":
+                    incident.resolution_note = f"[FALSE ALARM] {note or ''}".strip()
+                
+                from app.incident.models import IncidentReplayEvent
+                res_event = IncidentReplayEvent(
+                    incident_id=incident.id,
+                    event_type="incident_resolved",
+                    description=f"Incident resolved (Decision: {decision.replace('_', ' ').upper()}). Notes: {note or 'None'}",
+                    timestamp=incident.resolved_at
+                )
+                self._session.add(res_event)
+
+        self._repo.update(incident)
+        self._repo.commit()
+        return incident
+
+    def get_replay_timeline(self, incident_id: int):
+        """Retrieve chronological replay events for an incident."""
+        self.get_incident(incident_id)
+        return self._repo.get_replay_events(incident_id)
+
+    def get_replay_frames(self, incident_id: int):
+        """Retrieve all archived replay frames for an incident."""
+        self.get_incident(incident_id)
+        return self._repo.get_replay_frames(incident_id)
+
+    def get_replay_frame_by_index(self, incident_id: int, frame_index: int):
+        """Retrieve a specific replay frame details."""
+        return self._repo.get_replay_frame_by_index(incident_id, frame_index)

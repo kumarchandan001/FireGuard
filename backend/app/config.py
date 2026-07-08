@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     screenshot_quality: int = 85
     screenshot_retention_days: int = 90
 
+    # ── Replay Timeline ──────────────────────────────────────
+    replay_pre_trigger_frames: int = 5
+    replay_post_trigger_frames: int = 5
+
     # ── Alarm ────────────────────────────────────────────────
     alarm_enabled: bool = True
     alarm_confirmation_seconds: int = 2

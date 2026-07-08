@@ -133,6 +133,25 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     # Subscribe incident creation handler FIRST so it enriches the event with incident_id
     event_bus.subscribe(DETECTION_EVENT, incident_on_detection)
 
+    from app.ai_engine.intelligence_service import FireIntelligenceService
+
+    async def fire_intelligence_on_detection(event):
+        """Analyze the created incident in a fresh session."""
+        incident_id = event.data.get("incident_id")
+        if not incident_id:
+            logger.warning("No incident_id found in detection event, skipping intelligence analysis")
+            return
+        
+        session = incident_session_factory()
+        try:
+            svc = FireIntelligenceService(session)
+            await svc.analyze_incident(incident_id, event.data)
+        finally:
+            session.close()
+
+    # Subscribe intelligence handler SECOND so it sees the enriched incident_id
+    event_bus.subscribe(DETECTION_EVENT, fire_intelligence_on_detection)
+
     # Alarm (subscribes to DETECTION_EVENT second, so it sees the enriched incident_id)
     alarm_service = AlarmService(
         event_bus=event_bus,
@@ -146,7 +165,10 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         detector=detector,
         event_bus=event_bus,
         ws_manager=ws_manager,
+        session_factory=incident_session_factory,
         cooldown_seconds=settings.detection_cooldown_seconds,
+        pre_trigger_frames=settings.replay_pre_trigger_frames,
+        post_trigger_frames=settings.replay_post_trigger_frames,
     )
 
     # Store services for router access

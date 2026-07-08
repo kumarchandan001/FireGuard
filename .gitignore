@@ -41,6 +41,7 @@ ENV/
 
 # Data directories
 backend/data/screenshots/
+backend/data/replays/
 backend/data/*.db
 
 # Model weights

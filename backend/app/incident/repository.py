@@ -10,7 +10,7 @@ from sqlalchemy import select, func, desc
 from sqlalchemy.orm import Session
 
 from app.core.base_repository import BaseRepository
-from app.incident.models import Incident
+from app.incident.models import Incident, IncidentReplayEvent, IncidentReplayFrame
 
 
 class IncidentRepository(BaseRepository[Incident]):
@@ -95,3 +95,33 @@ class IncidentRepository(BaseRepository[Incident]):
             .order_by(desc(Incident.detected_at))
         )
         return list(self._session.execute(stmt).scalars().all())
+
+    def get_replay_events(self, incident_id: int) -> list[IncidentReplayEvent]:
+        """Retrieve chronological replay events for a given incident."""
+        stmt = (
+            select(IncidentReplayEvent)
+            .where(IncidentReplayEvent.incident_id == incident_id)
+            .order_by(IncidentReplayEvent.timestamp)
+        )
+        result = self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    def get_replay_frames(self, incident_id: int) -> list[IncidentReplayFrame]:
+        """Retrieve all archived replay frames for a given incident."""
+        stmt = (
+            select(IncidentReplayFrame)
+            .where(IncidentReplayFrame.incident_id == incident_id)
+            .order_by(IncidentReplayFrame.frame_index)
+        )
+        result = self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    def get_replay_frame_by_index(self, incident_id: int, frame_index: int) -> IncidentReplayFrame | None:
+        """Retrieve a specific replay frame by index."""
+        stmt = (
+            select(IncidentReplayFrame)
+            .where(IncidentReplayFrame.incident_id == incident_id)
+            .where(IncidentReplayFrame.frame_index == frame_index)
+        )
+        result = self._session.execute(stmt)
+        return result.scalar_one_or_none()

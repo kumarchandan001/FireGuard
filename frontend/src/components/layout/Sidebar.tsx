@@ -7,11 +7,12 @@
  *   - Operator profile block at bottom
  */
 
+import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Video, AlertOctagon, BarChart3, Settings, Shield } from 'lucide-react';
+import { LayoutDashboard, Video, AlertOctagon, BarChart3, Settings, Shield, Flame, CloudSun } from 'lucide-react';
+import { useAppContext } from './MainLayout';
 
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', path: '/', icon: LayoutDashboard },
   { id: 'monitoring', label: 'Live Monitoring', path: '/', icon: Video },
   { id: 'alerts', label: 'Alert Center', path: '/incidents', icon: AlertOctagon },
   { id: 'analytics', label: 'Analytics', path: '/analytics', icon: BarChart3 },
@@ -19,6 +20,25 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar() {
+  const context = useAppContext();
+  const isAlert = context?.systemState?.state === 'alert';
+  const [ambientTemp, setAmbientTemp] = useState(23.4);
+
+  useEffect(() => {
+    if (isAlert) {
+      setAmbientTemp(142.5);
+      return;
+    }
+    const timer = setInterval(() => {
+      setAmbientTemp((t) => {
+        const change = (Math.random() - 0.5) * 0.4;
+        const newTemp = t + change;
+        return Number(Math.max(22.8, Math.min(24.2, newTemp)).toFixed(1));
+      });
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [isAlert]);
+
   return (
     <nav
       style={{
@@ -93,13 +113,12 @@ export default function Sidebar() {
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
-            // Prevent active clash on Dashboard / Live Monitoring
-            const isDashboard = item.id === 'dashboard' || item.id === 'monitoring';
+            const isMonitoring = item.id === 'monitoring';
             return (
               <li key={item.id}>
                 <NavLink
                   to={item.path}
-                  end={isDashboard}
+                  end={isMonitoring}
                   style={({ isActive }) => ({
                     display: 'flex',
                     alignItems: 'center',
@@ -200,6 +219,50 @@ export default function Sidebar() {
               Active
             </p>
           </div>
+        </div>
+
+        {/* Dynamic Facility Weather/Temp Widget */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 12px',
+            marginTop: '8px',
+            background: isAlert ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+            border: `1px solid ${isAlert ? 'rgba(239, 68, 68, 0.3)' : 'var(--border-color)'}`,
+            borderRadius: 'var(--radius-sm)',
+            transition: 'all var(--transition-base)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {isAlert ? (
+              <Flame size={14} color="var(--danger)" className="emergency-pulse" />
+            ) : (
+              <CloudSun size={14} color="var(--accent)" />
+            )}
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '9px',
+                fontWeight: 600,
+                color: isAlert ? 'var(--danger)' : 'var(--text-secondary)',
+                letterSpacing: '0.06em',
+              }}
+            >
+              {isAlert ? 'THERMAL ALERT' : 'ENV TELEMETRY'}
+            </span>
+          </div>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '11px',
+              fontWeight: 700,
+              color: isAlert ? 'var(--danger)' : 'var(--text-primary)',
+            }}
+          >
+            {ambientTemp.toFixed(1)}°C
+          </span>
         </div>
       </div>
     </nav>

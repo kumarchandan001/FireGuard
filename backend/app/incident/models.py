@@ -8,7 +8,7 @@ tracking (detected → active → acknowledged → resolved).
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, Float, Integer, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base_model import Base, TimestampMixin
@@ -64,6 +64,17 @@ class Incident(Base, TimestampMixin):
     # Resolution
     resolution_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Fire Intelligence Engine fields
+    severity: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    estimated_cause: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    observed_behaviour: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    ai_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    recommended_actions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    explanation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Operator Decision fields
+    operator_decision: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default="none")
+
     # Future: FK to cameras and zones tables
     camera_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     zone_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -73,3 +84,36 @@ class Incident(Base, TimestampMixin):
             f"<Incident(id={self.id}, type={self.detection_type}, "
             f"confidence={self.confidence:.2f}, status={self.status})>"
         )
+
+
+class IncidentReplayEvent(Base):
+    """Chronological replay event log linked to an incident."""
+
+    __tablename__ = "incident_replay_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    incident_id: Mapped[int] = mapped_column(Integer, ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g., "camera_active", "smoke_detected"
+    description: Mapped[str] = mapped_column(String(200), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<IncidentReplayEvent(incident_id={self.incident_id}, type={self.event_type}, time={self.timestamp})>"
+
+
+class IncidentReplayFrame(Base):
+    """Replay buffer frame with per-frame detection telemetry and file links."""
+
+    __tablename__ = "incident_replay_frames"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    incident_id: Mapped[int] = mapped_column(Integer, ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False)
+    frame_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    file_path: Mapped[str] = mapped_column(String(255), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    detection_type: Mapped[str] = mapped_column(String(20), nullable=False, default="none")  # "fire" | "smoke" | "none"
+    bbox_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    def __repr__(self) -> str:
+        return f"<IncidentReplayFrame(incident_id={self.incident_id}, index={self.frame_index}, type={self.detection_type}, conf={self.confidence:.2f})>"

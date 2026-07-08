@@ -52,8 +52,34 @@ export interface Incident {
   resolution_note: string | null;
   camera_id: string | null;
   zone_id: string | null;
+  severity: string | null;
+  estimated_cause: string | null;
+  observed_behaviour: string | null;
+  ai_summary: string | null;
+  recommended_actions: string | null;
+  explanation: string | null;
+  operator_decision: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface IncidentReplayEvent {
+  id: number;
+  incident_id: number;
+  event_type: string;
+  description: string;
+  timestamp: string;
+}
+
+export interface IncidentReplayFrame {
+  id: number;
+  incident_id: number;
+  frame_index: number;
+  file_path: string;
+  timestamp: string;
+  confidence: number;
+  detection_type: string;
+  bbox_count: number;
 }
 
 // ── Settings Types ───────────────────────────────────────────

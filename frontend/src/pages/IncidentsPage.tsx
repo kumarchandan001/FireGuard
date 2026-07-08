@@ -8,7 +8,7 @@
  */
 
 import { useState, useCallback, memo, useEffect, useRef } from 'react';
-import { Flame, Check, Monitor, Download, Filter, HardDrive } from 'lucide-react';
+import { Flame, Check, Monitor, Download, Filter, HardDrive, Play, Pause, SkipBack, SkipForward, Video, Activity, Clock } from 'lucide-react';
 import Button from '../components/shared/Button';
 import HoldButton from '../components/shared/HoldButton';
 import EmptyState from '../components/shared/EmptyState';
@@ -19,7 +19,7 @@ import {
   DETECTION_TYPE_LABELS,
   INCIDENT_STATUS_LABELS,
 } from '../utils/constants';
-import type { Incident } from '../types';
+import type { Incident, IncidentReplayFrame, IncidentReplayEvent } from '../types';
 
 
 type TypeFilter = 'all' | 'fire' | 'smoke';
@@ -36,6 +36,12 @@ const IncidentsPage = memo(function IncidentsPage() {
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
   const terminalScrollRef = useRef<HTMLDivElement>(null);
   const perPage = 15;
+
+  // Replay timeline states
+  const [replayFrames, setReplayFrames] = useState<IncidentReplayFrame[]>([]);
+  const [replayTimeline, setReplayTimeline] = useState<IncidentReplayEvent[]>([]);
+  const [currentFrameIndex, setCurrentFrameIndex] = useState<number>(0);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
 
   const queryParams = new URLSearchParams();
   queryParams.set('page', String(page));
@@ -86,6 +92,41 @@ const IncidentsPage = memo(function IncidentsPage() {
     }
   }, [selectedIncidentId]);
 
+  // Fetch replay frames and timeline when selection or status changes
+  useEffect(() => {
+    if (selectedIncident) {
+      setReplayFrames([]);
+      setReplayTimeline([]);
+      setCurrentFrameIndex(0);
+      setIsPlaying(false);
+
+      apiClient.get<IncidentReplayFrame[]>(`/incidents/${selectedIncident.id}/replay/frames`)
+        .then((res) => {
+          setReplayFrames(res.data || []);
+        })
+        .catch((err) => console.error("Failed to load replay frames", err));
+
+      apiClient.get<IncidentReplayEvent[]>(`/incidents/${selectedIncident.id}/replay/timeline`)
+        .then((res) => {
+          setReplayTimeline(res.data || []);
+        })
+        .catch((err) => console.error("Failed to load replay timeline", err));
+    }
+  }, [selectedIncident?.id, selectedIncident?.status]);
+
+  // Replay frame auto-playback loop
+  useEffect(() => {
+    let interval: any = null;
+    if (isPlaying && replayFrames.length > 0) {
+      interval = setInterval(() => {
+        setCurrentFrameIndex((prev) => (prev + 1) % replayFrames.length);
+      }, 350);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isPlaying, replayFrames.length]);
+
   // Terminal scroll handler
   useEffect(() => {
     if (terminalScrollRef.current) {
@@ -108,6 +149,24 @@ const IncidentsPage = memo(function IncidentsPage() {
       addTerminalLogLine('>> ERROR: COMMAND TRANSMISSION FAILED');
     } finally { 
       setSubmitting(false); 
+    }
+  }, [refresh, resolutionNote]);
+
+  const handleOperatorDecision = useCallback(async (id: number, decision: 'confirmed' | 'false_alarm' | 'resolved') => {
+    setSubmitting(true);
+    try {
+      await apiClient.patch(`/incidents/${id}/decision`, { decision, note: resolutionNote });
+      const actionLabels = {
+        confirmed: 'THREAT CONFIRMED. PROTOCOL ACTIVE.',
+        false_alarm: 'ALERT DISMISSED AS FALSE ALARM.',
+        resolved: 'THREAT SUCCESSFULLY NEUTRALIZED AND CLOSED.'
+      };
+      addTerminalLogLine(`>> DISPATCH: OPERATOR DECISION - ${actionLabels[decision]}`);
+      refresh();
+    } catch {
+      addTerminalLogLine('>> ERROR: COMMAND TRANSMISSION FAILED');
+    } finally {
+      setSubmitting(false);
     }
   }, [refresh, resolutionNote]);
 
@@ -588,76 +647,411 @@ const IncidentsPage = memo(function IncidentsPage() {
                     })}
                   </div>
 
-                  {/* Info grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ background: '#10131B', border: '1px solid #363942', padding: '10px', borderRadius: 'var(--radius-sm)' }}>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Zone</span>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {selectedIncident.zone_id || 'Server Room B'}
-                      </span>
-                    </div>
+                  {/* 1. Fire Intelligence Panel */}
+                  {selectedIncident.severity && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', backgroundColor: '#10131B', border: '1px solid #363942', borderRadius: 'var(--radius-sm)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700, color: 'var(--text-secondary)' }}>FIRE INTELLIGENCE</span>
+                        {/* Severity Badge */}
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '9px',
+                          fontWeight: 800,
+                          fontFamily: 'var(--font-mono)',
+                          textTransform: 'uppercase',
+                          border: '1px solid',
+                          ...(() => {
+                            if (selectedIncident.severity === 'CRITICAL') return { color: 'var(--danger)', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.4)' };
+                            if (selectedIncident.severity === 'HIGH') return { color: 'var(--warning)', background: 'rgba(245, 158, 11, 0.15)', borderColor: 'rgba(245, 158, 11, 0.4)' };
+                            if (selectedIncident.severity === 'MEDIUM') return { color: '#06b6d4', background: 'rgba(6, 182, 212, 0.15)', borderColor: 'rgba(6, 182, 212, 0.4)' };
+                            return { color: 'var(--success)', background: 'rgba(16, 185, 129, 0.12)', borderColor: 'rgba(16, 185, 129, 0.3)' };
+                          })()
+                        }}>
+                          {selectedIncident.severity}
+                        </span>
+                      </div>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <div style={{ padding: '8px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 'var(--radius-sm)' }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>ESTIMATED CONTEXT</span>
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedIncident.estimated_cause}</span>
+                        </div>
+                        <div style={{ padding: '8px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 'var(--radius-sm)' }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>OBSERVED BEHAVIOUR</span>
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedIncident.observed_behaviour}</span>
+                        </div>
+                      </div>
 
-                    <div style={{ background: '#10131B', border: '1px solid #363942', padding: '10px', borderRadius: 'var(--radius-sm)' }}>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Impact</span>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--danger)' }}>
-                        High / Mission Critical
-                      </span>
+                      {/* Explainability Bullets */}
+                      {selectedIncident.explanation && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--text-muted)' }}>AI EXPLAINABILITY PROOFS</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                            {selectedIncident.explanation.split('\n').map((line, idx) => (
+                              <div key={idx} style={{ fontSize: '10px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                                ✓ {line}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Callout Summary */}
+                      <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: 'var(--radius-sm)', borderLeft: '2px solid var(--accent)' }}>
+                        {selectedIncident.ai_summary}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* 2. Evidence Collected Panel */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: '#10131B', border: '1px solid #363942', borderRadius: 'var(--radius-sm)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700, color: 'var(--text-secondary)' }}>EVIDENCE COLLECTED</span>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '8px', display: 'block' }}>SCREENSHOT STATUS</span>
+                        <span style={{ color: selectedIncident.screenshot_path ? 'var(--success)' : 'var(--danger)' }}>
+                          {selectedIncident.screenshot_path ? '✓ SAVED ON DISK' : '✗ NOT SAVED'}
+                        </span>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '8px', display: 'block' }}>TIMESTAMP</span>
+                        <span style={{ color: 'var(--text-primary)' }}>
+                          {new Date(selectedIncident.detected_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '8px', display: 'block' }}>DETECTION TYPE</span>
+                        <span style={{ color: 'var(--text-primary)', textTransform: 'uppercase' }}>
+                          {selectedIncident.detection_type.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '8px', display: 'block' }}>MAX CONFIDENCE</span>
+                        <span style={{ color: 'var(--text-primary)' }}>
+                          {(selectedIncident.confidence * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '8px', display: 'block' }}>BOUNDING BOXES</span>
+                        <span style={{ color: 'var(--text-primary)' }}>
+                          {(() => {
+                            const bulletLines = selectedIncident.explanation ? selectedIncident.explanation.split('\n') : [];
+                            const bboxLine = bulletLines.find(l => l.includes('Multiple threat regions'));
+                            if (bboxLine) {
+                              const match = bboxLine.match(/\(count:\s*(\d+)\)/);
+                              return match ? `${match[1]} regions detected` : '1 region detected';
+                            }
+                            return '1 region detected';
+                          })()}
+                        </span>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '8px', display: 'block' }}>SOURCE DEVICE ID</span>
+                        <span style={{ color: 'var(--text-primary)' }}>
+                          {selectedIncident.camera_id || 'CAM-SRB-12'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Actions Area */}
-                  <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid #363942' }}>
-                    <h5 style={{ margin: '0 0 10px 0', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Immediate Actions</h5>
-                    
-                    {(selectedIncident.status === 'active' || selectedIncident.status === 'acknowledged') ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>RESOLUTION NOTES</span>
+                  {/* Incident Investigation Panel (Replay & Timeline) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', backgroundColor: '#10131B', border: '1px solid #363942', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Video size={12} color="var(--accent)" /> INCIDENT INVESTIGATION
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--text-muted)' }}>
+                        EVIDENCE REPLAY
+                      </span>
+                    </div>
+
+                    {/* Replay Statistics Sub-panel */}
+                    {replayFrames.length > 0 && (() => {
+                      const maxConfidence = Math.max(...replayFrames.map(f => f.confidence), 0);
+                      const detectionCount = replayFrames.filter(f => f.detection_type !== 'none').length;
+                      
+                      let duration = 0;
+                      if (replayFrames.length >= 2) {
+                        const start = new Date(replayFrames[0].timestamp).getTime();
+                        const end = new Date(replayFrames[replayFrames.length - 1].timestamp).getTime();
+                        duration = Math.max(0, (end - start) / 1000);
+                      }
+
+                      const firstDet = replayFrames.find(f => f.detection_type !== 'none');
+                      const firstDetTime = firstDet ? new Date(firstDet.timestamp).toLocaleTimeString() : 'N/A';
+                      
+                      const alarmFrame = replayFrames.find(f => f.frame_index === 0);
+                      const alarmTime = alarmFrame ? new Date(alarmFrame.timestamp).toLocaleTimeString() : new Date(selectedIncident.detected_at).toLocaleTimeString();
+
+                      return (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.04)', fontFamily: 'var(--font-mono)', fontSize: '9px' }}>
+                          <div>
+                            <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '8px' }}>DURATION</span>
+                            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{duration.toFixed(1)}s</span>
+                          </div>
+                          <div>
+                            <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '8px' }}>TOTAL FRAMES</span>
+                            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{replayFrames.length} frames</span>
+                          </div>
+                          <div>
+                            <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '8px' }}>DETECTION COUNT</span>
+                            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{detectionCount} frames</span>
+                          </div>
+                          <div>
+                            <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '8px' }}>MAX CONFIDENCE</span>
+                            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{(maxConfidence * 100).toFixed(1)}%</span>
+                          </div>
+                          <div>
+                            <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '8px' }}>FIRST DETECTION</span>
+                            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{firstDetTime}</span>
+                          </div>
+                          <div>
+                            <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '8px' }}>ALARM TRIGGER</span>
+                            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{alarmTime}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Replay Media Player */}
+                    {replayFrames.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div
+                          style={{
+                            position: 'relative',
+                            width: '100%',
+                            height: '160px',
+                            background: '#000',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {(() => {
+                            const activeFrame = replayFrames[currentFrameIndex];
+                            if (!activeFrame) return null;
+                            const activeImageUrl = apiClient.getResourceUrl(`/incidents/${selectedIncident.id}/replay/frames/${activeFrame.frame_index}`);
+                            
+                            return (
+                              <>
+                                <img
+                                  src={activeImageUrl}
+                                  alt={`Replay frame ${activeFrame.frame_index}`}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                                
+                                {/* Overlay HUD */}
+                                <div style={{ position: 'absolute', top: '6px', left: '6px', backgroundColor: 'rgba(0,0,0,0.7)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.15)', fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--text-secondary)' }}>
+                                  FRAME: {activeFrame.frame_index} ({activeFrame.frame_index < 0 ? '' : '+'}{activeFrame.frame_index}f)
+                                </div>
+
+                                <div style={{ position: 'absolute', top: '6px', right: '6px', backgroundColor: 'rgba(0,0,0,0.7)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.15)', fontFamily: 'var(--font-mono)', fontSize: '8px', color: activeFrame.confidence > 0 ? 'var(--danger)' : 'var(--text-secondary)' }}>
+                                  AI: {(activeFrame.confidence * 100).toFixed(0)}% ({activeFrame.detection_type.toUpperCase()})
+                                </div>
+
+                                <div style={{ position: 'absolute', bottom: '6px', left: '6px', backgroundColor: 'rgba(0,0,0,0.7)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.15)', fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--text-muted)' }}>
+                                  {new Date(activeFrame.timestamp).toLocaleTimeString()}
+                                </div>
+
+                                <div style={{ position: 'absolute', bottom: '6px', right: '6px', backgroundColor: 'rgba(0,0,0,0.7)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.15)', fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--text-secondary)' }}>
+                                  BOXES: {activeFrame.bbox_count}
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Player Controls */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 6px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 'var(--radius-sm)' }}>
+                          <button
+                            onClick={() => setIsPlaying(!isPlaying)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', padding: '4px' }}
+                            title={isPlaying ? 'Pause' : 'Play'}
+                          >
+                            {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                          </button>
+                          
+                          <button
+                            onClick={() => {
+                              setIsPlaying(false);
+                              setCurrentFrameIndex((prev) => (prev - 1 + replayFrames.length) % replayFrames.length);
+                            }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', padding: '4px' }}
+                            title="Step Backward"
+                          >
+                            <SkipBack size={12} />
+                          </button>
+
                           <input
-                            type="text"
+                            type="range"
+                            min={0}
+                            max={replayFrames.length - 1}
+                            value={currentFrameIndex}
+                            onChange={(e) => {
+                              setIsPlaying(false);
+                              setCurrentFrameIndex(Number(e.target.value));
+                            }}
+                            style={{
+                              flex: 1,
+                              height: '4px',
+                              background: '#2c313d',
+                              borderRadius: '2px',
+                              outline: 'none',
+                              cursor: 'pointer',
+                              accentColor: 'var(--accent)',
+                            }}
+                          />
+
+                          <button
+                            onClick={() => {
+                              setIsPlaying(false);
+                              setCurrentFrameIndex((prev) => (prev + 1) % replayFrames.length);
+                            }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', padding: '4px' }}
+                            title="Step Forward"
+                          >
+                            <SkipForward size={12} />
+                          </button>
+
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--text-muted)', minWidth: '40px', textAlign: 'right' }}>
+                            {currentFrameIndex + 1} / {replayFrames.length}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '20px', textAlign: 'center', background: '#0a0d14', borderRadius: 'var(--radius-sm)', border: '1px dashed rgba(255,255,255,0.08)' }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-muted)' }}>
+                          NO REPLAY TIMELINE RECORDED FOR THIS INCIDENT
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Chronological Timeline Events sub-panel */}
+                    {replayTimeline.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 700, color: 'var(--text-secondary)' }}>INVESTIGATION TIMELINE LOG</span>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '8px', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
+                          {replayTimeline.map((ev) => {
+                            let iconColor = 'var(--text-muted)';
+                            if (ev.event_type === 'alarm_triggered') iconColor = 'var(--danger)';
+                            else if (ev.event_type === 'incident_resolved') iconColor = 'var(--success)';
+                            else if (ev.event_type === 'operator_acknowledgment') iconColor = 'var(--warning)';
+                            else if (ev.event_type.includes('detected')) iconColor = 'var(--warning)';
+
+                            return (
+                              <div key={ev.id} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                {/* Timeline Dot */}
+                                <div style={{
+                                  position: 'absolute',
+                                  left: '-12px',
+                                  top: '4px',
+                                  width: '7px',
+                                  height: '7px',
+                                  borderRadius: '50%',
+                                  backgroundColor: iconColor,
+                                  border: '1.5px solid #10131B',
+                                }} />
+                                
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase' }}>
+                                    {ev.event_type.replace('_', ' ')}
+                                  </span>
+                                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--text-muted)' }}>
+                                    {new Date(ev.timestamp).toLocaleTimeString()}
+                                  </span>
+                                </div>
+                                <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
+                                  {ev.description}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Operator Decision Console */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: '#10131B', border: '1px solid #363942', borderRadius: 'var(--radius-sm)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700, color: 'var(--text-secondary)' }}>OPERATOR DECISION CONSOLE</span>
+                    
+                    {selectedIncident.operator_decision && selectedIncident.operator_decision !== 'none' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 'var(--radius-sm)' }}>
+                          <Check size={14} color="var(--success)" />
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--success)', fontWeight: 700, textTransform: 'uppercase' }}>
+                            DECISION RECORDED: {selectedIncident.operator_decision.replace('_', ' ')}
+                          </span>
+                        </div>
+                        {selectedIncident.resolution_note && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '6px 8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 'var(--radius-sm)' }}>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--text-muted)', display: 'block' }}>OPERATOR NOTES</span>
+                            {selectedIncident.resolution_note}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span style={{ fontSize: '8px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>OPERATOR ACTION NOTES</span>
+                          <textarea
                             value={resolutionNote}
                             onChange={(e) => setResolutionNote(e.target.value)}
-                            placeholder="Describe action taken..."
+                            placeholder="Input rationale for action/dismissal..."
+                            rows={2}
                             style={{
-                              backgroundColor: '#10131B',
+                              backgroundColor: '#060a13',
                               border: '1px solid #363942',
                               borderRadius: 'var(--radius-sm)',
-                              padding: '8px 10px',
+                              padding: '8px',
                               fontFamily: 'var(--font-mono)',
                               fontSize: '11px',
                               color: 'var(--text-primary)',
                               outline: 'none',
+                              resize: 'none',
                             }}
                           />
                         </div>
 
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                          {selectedIncident.status === 'active' && (
-                            <HoldButton
-                              label="Ack Alert"
-                              color="var(--warning)"
-                              fillColor="rgba(245, 158, 11, 0.25)"
-                              onConfirm={() => handleAction(selectedIncident.id, 'acknowledge')}
-                              holdDuration={1500}
-                              disabled={submitting}
-                              icon={<Flame size={12} />}
-                            />
-                          )}
+                        {/* Explainable Decision buttons */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           <HoldButton
-                            label="Resolve Alert"
-                            color="var(--success)"
-                            fillColor="rgba(16, 185, 129, 0.25)"
-                            onConfirm={() => handleAction(selectedIncident.id, 'resolve')}
-                            holdDuration={2000}
+                            label="CONFIRM THREAT"
+                            color="var(--warning)"
+                            fillColor="rgba(245, 158, 11, 0.25)"
+                            onConfirm={() => handleOperatorDecision(selectedIncident.id, 'confirmed')}
+                            holdDuration={1000}
                             disabled={submitting}
-                            icon={<Check size={12} />}
+                            icon={<Flame size={12} />}
                           />
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <div style={{ flex: 1 }}>
+                              <HoldButton
+                                label="FALSE ALARM"
+                                color="var(--text-secondary)"
+                                fillColor="rgba(136, 146, 168, 0.15)"
+                                onConfirm={() => handleOperatorDecision(selectedIncident.id, 'false_alarm')}
+                                holdDuration={1500}
+                                disabled={submitting}
+                                icon={<Check size={12} />}
+                              />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <HoldButton
+                                label="RESOLVE INCIDENT"
+                                color="var(--success)"
+                                fillColor="rgba(16, 185, 129, 0.25)"
+                                onConfirm={() => handleOperatorDecision(selectedIncident.id, 'resolved')}
+                                holdDuration={1500}
+                                disabled={submitting}
+                                icon={<Check size={12} />}
+                              />
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 'var(--radius-sm)' }}>
-                        <Check size={16} color="var(--success)" />
-                        <span style={{ fontSize: '12px', color: 'var(--success)', fontWeight: 600 }}>This incident is resolved. No action required.</span>
                       </div>
                     )}
                   </div>

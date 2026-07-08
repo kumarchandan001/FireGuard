@@ -95,6 +95,20 @@ DEFAULT_SETTINGS: list[dict] = [
         "category": "system",
         "description": "Days to retain screenshot files before auto-cleanup",
     },
+    {
+        "key": "replay_pre_trigger_frames",
+        "value": "5",
+        "value_type": "int",
+        "category": "system",
+        "description": "Number of pre-trigger frames to record in incident replay (1–10)",
+    },
+    {
+        "key": "replay_post_trigger_frames",
+        "value": "5",
+        "value_type": "int",
+        "category": "system",
+        "description": "Number of post-trigger frames to record in incident replay (1–10)",
+    },
 ]
 
 
