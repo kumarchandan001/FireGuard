@@ -8,7 +8,7 @@
  */
 
 import { useState, useCallback, memo, useEffect, useRef } from 'react';
-import { Flame, Check, Monitor, Download, Filter, HardDrive, Play, Pause, SkipBack, SkipForward, Video, Activity, Clock } from 'lucide-react';
+import { Flame, Check, Monitor, Download, Filter, HardDrive, Play, Pause, SkipBack, SkipForward, Video } from 'lucide-react';
 import Button from '../components/shared/Button';
 import HoldButton from '../components/shared/HoldButton';
 import EmptyState from '../components/shared/EmptyState';
@@ -102,13 +102,13 @@ const IncidentsPage = memo(function IncidentsPage() {
 
       apiClient.get<IncidentReplayFrame[]>(`/incidents/${selectedIncident.id}/replay/frames`)
         .then((res) => {
-          setReplayFrames(res.data || []);
+          setReplayFrames(res || []);
         })
         .catch((err) => console.error("Failed to load replay frames", err));
 
       apiClient.get<IncidentReplayEvent[]>(`/incidents/${selectedIncident.id}/replay/timeline`)
         .then((res) => {
-          setReplayTimeline(res.data || []);
+          setReplayTimeline(res || []);
         })
         .catch((err) => console.error("Failed to load replay timeline", err));
     }
@@ -133,24 +133,6 @@ const IncidentsPage = memo(function IncidentsPage() {
       terminalScrollRef.current.scrollTop = terminalScrollRef.current.scrollHeight;
     }
   }, [terminalLogs]);
-
-  const handleAction = useCallback(async (id: number, action: 'acknowledge' | 'resolve') => {
-    setSubmitting(true);
-    try {
-      if (action === 'resolve') {
-        await apiClient.patch(`/incidents/${id}/resolve`, { note: resolutionNote });
-        addTerminalLogLine('>> DISPATCH: THREAT RESOLVED. CLOSE SIGNAL SENT.');
-      } else {
-        await apiClient.patch(`/incidents/${id}/acknowledge`);
-        addTerminalLogLine('>> DISPATCH: OPERATOR ACKNOWLEDGED. THREAT CONFIRMED.');
-      }
-      refresh();
-    } catch { 
-      addTerminalLogLine('>> ERROR: COMMAND TRANSMISSION FAILED');
-    } finally { 
-      setSubmitting(false); 
-    }
-  }, [refresh, resolutionNote]);
 
   const handleOperatorDecision = useCallback(async (id: number, decision: 'confirmed' | 'false_alarm' | 'resolved') => {
     setSubmitting(true);

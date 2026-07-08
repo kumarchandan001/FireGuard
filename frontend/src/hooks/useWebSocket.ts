@@ -39,10 +39,24 @@ export function useWebSocket(): UseWebSocketReturn {
   const [alarmStatus, setAlarmStatus] = useState<AlarmStatus | null>(null);
 
   const connect = useCallback(() => {
-    // Determine WebSocket URL based on current location
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const url = `${protocol}//${host}/ws/feed`;
+    // Determine WebSocket URL based on current location or VITE_API_URL
+    let wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    let wsHost = window.location.host;
+
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (apiUrl) {
+      try {
+        if (apiUrl.startsWith('http://') || apiUrl.startsWith('https://')) {
+          const parsed = new URL(apiUrl);
+          wsHost = parsed.host;
+          wsProtocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+        }
+      } catch (e) {
+        console.error('Failed to parse VITE_API_URL for WebSocket config:', e);
+      }
+    }
+
+    const url = `${wsProtocol}//${wsHost}/ws/feed`;
 
     setConnectionState('connecting');
     const ws = new WebSocket(url);

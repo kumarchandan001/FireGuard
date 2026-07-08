@@ -1,0 +1,50 @@
+# 🛡️ FireGuard AI — Render Blueprint Configuration
+#
+# This blueprint defines the deployment architecture on Render:
+#   1. backend: Python Web Service (FastAPI) running Uvicorn
+#   2. frontend: Static Site (React + Vite)
+#
+# To deploy: Go to Render Dashboard -> Blueprints -> New Blueprint Instance -> Connect your Repository.
+
+services:
+  # ──────────────────────────────────────────────
+  # 1. Backend Web Service (FastAPI)
+  # ──────────────────────────────────────────────
+  - type: web
+    name: fireguard-backend
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: FIREGUARD_ENV
+        value: production
+      - key: FIREGUARD_DATABASE_URL
+        value: sqlite:///data/fireguard.db
+      - key: FIREGUARD_SCREENSHOT_DIR
+        value: /app/data/screenshots
+    # Persistent Disk (SQLite storage & Screenshots)
+    # NOTE: Render Disks require a paid tier (Starter or higher).
+    # If deploying on the Free tier, comment out or remove the 'disk' block below.
+    # (Without a disk, your SQLite database and screenshots will reset on redeployment).
+    disk:
+      name: fireguard-data
+      mountPath: /app/data
+      sizeGB: 1
+
+  # ──────────────────────────────────────────────
+  # 2. Frontend Static Site (React + Vite)
+  # ──────────────────────────────────────────────
+  - type: web
+    name: fireguard-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: npm run build
+    staticPublishPath: dist
+    envVars:
+      # Automatically injection of the backend service's URL into the Vite build environment
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: fireguard-backend
+          property: host

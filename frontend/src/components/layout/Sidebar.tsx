@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Video, AlertOctagon, BarChart3, Settings, Shield, Flame, CloudSun } from 'lucide-react';
+import { Video, AlertOctagon, BarChart3, Settings, Shield, Flame, CloudSun } from 'lucide-react';
 import { useAppContext } from './MainLayout';
 
 const NAV_ITEMS = [

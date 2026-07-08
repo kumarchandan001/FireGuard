@@ -5,7 +5,7 @@
  * and typed response helpers. All API calls go through this module.
  */
 
-const API_BASE_URL = '/api/v1';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || '') + '/api/v1';
 
 interface RequestOptions {
   params?: Record<string, string | number | boolean | undefined>;
