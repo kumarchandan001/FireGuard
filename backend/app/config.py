@@ -45,11 +45,11 @@ class Settings(BaseSettings):
 
     # ── Camera ───────────────────────────────────────────────
     camera_index: int = 0
-    camera_fps: int = 15
+    camera_fps: int = 30
 
     # ── AI Engine ────────────────────────────────────────────
     model_path: str = str(_BACKEND_DIR / "models" / "yolov8n_fire.pt")
-    confidence_threshold: float = 0.65
+    confidence_threshold: float = 0.80
     detection_cooldown_seconds: int = 30
 
     # ── Storage ──────────────────────────────────────────────

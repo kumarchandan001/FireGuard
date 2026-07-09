@@ -17,7 +17,7 @@ DEFAULT_SETTINGS: list[dict] = [
     # Detection settings
     {
         "key": "detection_confidence_threshold",
-        "value": "0.65",
+        "value": "0.80",
         "value_type": "float",
         "category": "detection",
         "description": "Minimum confidence score (0.0–1.0) to trigger an alarm",
@@ -61,7 +61,7 @@ DEFAULT_SETTINGS: list[dict] = [
     # Camera settings
     {
         "key": "camera_fps",
-        "value": "15",
+        "value": "30",
         "value_type": "int",
         "category": "camera",
         "description": "Camera capture frames per second",

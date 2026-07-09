@@ -31,11 +31,12 @@ class CameraSource(Protocol):
 class MockCameraSource:
     """Simulated camera source for environments without physical webcams."""
 
-    def __init__(self, width: int = 640, height: int = 480):
+    def __init__(self, width: int = 640, height: int = 480, fps: int = 15):
         self._width = width
         self._height = height
         self._opened = False
         self._frame_index = 0
+        self._fps = fps
 
     def open(self) -> bool:
         self._opened = True
@@ -90,7 +91,7 @@ class MockCameraSource:
         frame = cv2.add(frame, noise)
 
         self._frame_index += 1
-        time.sleep(0.06) # Simulate capture frame latency (approx 15 FPS)
+        time.sleep(1.0 / self._fps) # Simulate capture frame latency dynamically
         return True, frame
 
     def release(self) -> None:
@@ -104,10 +105,11 @@ class MockCameraSource:
 class WebcamSource:
     """OpenCV webcam capture implementation with automatic mock fallback."""
 
-    def __init__(self, camera_index: int = 0, width: int = 640, height: int = 480):
+    def __init__(self, camera_index: int = 0, width: int = 640, height: int = 480, fps: int = 15):
         self._camera_index = camera_index
         self._width = width
         self._height = height
+        self._fps = fps
         self._cap: cv2.VideoCapture | None = None
         self._mock_source: MockCameraSource | None = None
 
@@ -127,7 +129,7 @@ class WebcamSource:
 
         if self._cap is None or not self._cap.isOpened():
             logger.warning("Failed to open physical webcam at index %d. Activating simulated MockCameraSource.", self._camera_index)
-            self._mock_source = MockCameraSource(self._width, self._height)
+            self._mock_source = MockCameraSource(self._width, self._height, self._fps)
             return self._mock_source.open()
 
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._width)
@@ -172,7 +174,7 @@ class CameraService:
     """
 
     def __init__(self, camera_index: int = 0, fps: int = 15, width: int = 640, height: int = 480):
-        self._source = WebcamSource(camera_index, width, height)
+        self._source = WebcamSource(camera_index, width, height, fps)
         self._target_fps = fps
         self._frame_interval = 1.0 / fps
 

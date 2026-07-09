@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useState } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import VideoFeed from '../components/monitoring/VideoFeed';
 import StatusPanel from '../components/monitoring/StatusPanel';
 import TerminalLog from '../components/monitoring/TerminalLog';
@@ -25,6 +26,11 @@ interface IncidentSummary {
 export default function MonitoringPage() {
   const { ws, systemState, cameraOnline, aiReady } = useAppContext();
   const [activeTab, setActiveTab] = useState<'surveillance' | 'evacuation'>('surveillance');
+  const [maximizedCameraId, setMaximizedCameraId] = useState<string | null>(null);
+
+  const toggleMaximize = useCallback((id: string) => {
+    setMaximizedCameraId(prev => prev === id ? null : id);
+  }, []);
 
   const { data: summary } = useApi<IncidentSummary>('/incidents/summary', { pollInterval: 10000 });
   const { data: recentIncidents } = useApi<Incident[]>('/incidents/recent?limit=10', { pollInterval: 10000 });
@@ -145,15 +151,21 @@ export default function MonitoringPage() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gridTemplateRows: '1fr 1fr',
+              gridTemplateColumns: maximizedCameraId ? '1fr' : '1fr 1fr',
+              gridTemplateRows: maximizedCameraId ? '1fr' : '1fr 1fr',
               gap: '8px',
               flex: 1,
               minHeight: 0,
             }}
           >
             {/* CAM 01: Actual Live feed */}
-            <div style={{ position: 'relative', overflow: 'hidden' }}>
+            <div
+              style={{
+                position: 'relative',
+                overflow: 'hidden',
+                display: maximizedCameraId && maximizedCameraId !== 'CAM_01' ? 'none' : 'block',
+              }}
+            >
               <VideoFeed
                 frame={ws.latestFrame}
                 fps={ws.fps}
@@ -163,33 +175,47 @@ export default function MonitoringPage() {
                 alarmStatus={ws.alarmStatus}
                 onAcknowledge={handleAcknowledge}
                 onDismiss={handleDismiss}
+                isMaximized={maximizedCameraId === 'CAM_01'}
+                onToggleMaximize={() => toggleMaximize('CAM_01')}
               />
             </div>
 
             {/* CAM 04: Mock Hallway */}
-            <MockCamera
-              id="CAM_04"
-              name="EXT_NORTH"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjWcIqO4mey06Ho51VLWHxje1LvfAqyAf5vld_YD878cJFCi-W57SYEsQQGtWfkGE31MKLMMiQCGwYaH3OCZgyUqgdKXBBrQFwAwuocGG7sPKKTY4DG0x3BjWXRhcY2Mu2QmwhY9iCTTNAK2RSJxwLQ001GzmjQ7O69amwXWY-s18f6HXM4UwtERjTMBBsT59kFyNxoVOmzOXebJnBMFvgJGnmAQLPiPH8tcYlbrNfy1bVPfoAdLuB"
-              aiStatus="AI: CLEAR"
-            />
+            <div style={{ display: maximizedCameraId && maximizedCameraId !== 'CAM_04' ? 'none' : 'block', height: '100%' }}>
+              <MockCamera
+                id="CAM_04"
+                name="EXT_NORTH"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjWcIqO4mey06Ho51VLWHxje1LvfAqyAf5vld_YD878cJFCi-W57SYEsQQGtWfkGE31MKLMMiQCGwYaH3OCZgyUqgdKXBBrQFwAwuocGG7sPKKTY4DG0x3BjWXRhcY2Mu2QmwhY9iCTTNAK2RSJxwLQ001GzmjQ7O69amwXWY-s18f6HXM4UwtERjTMBBsT59kFyNxoVOmzOXebJnBMFvgJGnmAQLPiPH8tcYlbrNfy1bVPfoAdLuB"
+                aiStatus="AI: CLEAR"
+                isMaximized={maximizedCameraId === 'CAM_04'}
+                onToggleMaximize={() => toggleMaximize('CAM_04')}
+              />
+            </div>
 
             {/* CAM 08: Mock Warehouse */}
-            <MockCamera
-              id="CAM_08"
-              name="WAREHOUSE_B"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZuoMndZlBtj2OsqGEgoUmVBO0i5YiQrZWyeTFKj6slOHjPRFR3owAx4Gm9qzxv7olbd_5OWQpn3lj-I4cD-qg4jA4xyicKs055rs1r4thxrXY3P98_mdxoeLE8S216N8ktchek8GM9jhQs05Kqnfl89mw2QHp8fF0AGm2TtjBgzn9hZbFMotOg6jA1iHfN-OOv-5n_gDE0i9D5i_JrWgutTa9btAmNaRCSt2vvWDdK1EhJb_wsnsX"
-              aiStatus="FORKLIFT 98%"
-              hasDetectionBox
-            />
+            <div style={{ display: maximizedCameraId && maximizedCameraId !== 'CAM_08' ? 'none' : 'block', height: '100%' }}>
+              <MockCamera
+                id="CAM_08"
+                name="WAREHOUSE_B"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZuoMndZlBtj2OsqGEgoUmVBO0i5YiQrZWyeTFKj6slOHjPRFR3owAx4Gm9qzxv7olbd_5OWQpn3lj-I4cD-qg4jA4xyicKs055rs1r4thxrXY3P98_mdxoeLE8S216N8ktchek8GM9jhQs05Kqnfl89mw2QHp8fF0AGm2TtjBgzn9hZbFMotOg6jA1iHfN-OOv-5n_gDE0i9D5i_JrWgutTa9btAmNaRCSt2vvWDdK1EhJb_wsnsX"
+                aiStatus="FORKLIFT 98%"
+                hasDetectionBox
+                isMaximized={maximizedCameraId === 'CAM_08'}
+                onToggleMaximize={() => toggleMaximize('CAM_08')}
+              />
+            </div>
 
             {/* CAM 12: Mock Stairwell */}
-            <MockCamera
-              id="CAM_12"
-              name="STAIR_03"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-UGy-uqYLsJMcfxLjVllF_4ctkQT3729W3vMsGLh_Aixjz_WLiO-HN0h1gPaFTVd9Nf6cd6vCBefd7WMl2LjGDJiY8vNz5SD5ZoLUu3z87cBHKaq66xUIpXMGUNAdjByA1kAGbWEx_kurIGdFsOqdHAodGFz8lO60gP403qfHu4bMEw-d2Pms-45RPSJaKiHSSTOUq91Eyd9f8VUH9yha0G-_9kwqNjWHi8vpxHICVAGpZmiv6FBs"
-              aiStatus="AI: CLEAR"
-            />
+            <div style={{ display: maximizedCameraId && maximizedCameraId !== 'CAM_12' ? 'none' : 'block', height: '100%' }}>
+              <MockCamera
+                id="CAM_12"
+                name="STAIR_03"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-UGy-uqYLsJMcfxLjVllF_4ctkQT3729W3vMsGLh_Aixjz_WLiO-HN0h1gPaFTVd9Nf6cd6vCBefd7WMl2LjGDJiY8vNz5SD5ZoLUu3z87cBHKaq66xUIpXMGUNAdjByA1kAGbWEx_kurIGdFsOqdHAodGFz8lO60gP403qfHu4bMEw-d2Pms-45RPSJaKiHSSTOUq91Eyd9f8VUH9yha0G-_9kwqNjWHi8vpxHICVAGpZmiv6FBs"
+                aiStatus="AI: CLEAR"
+                isMaximized={maximizedCameraId === 'CAM_12'}
+                onToggleMaximize={() => toggleMaximize('CAM_12')}
+              />
+            </div>
           </div>
         ) : (
           /* Evacuation Route Planner */
@@ -218,12 +244,16 @@ function MockCamera({
   src,
   aiStatus,
   hasDetectionBox = false,
+  isMaximized = false,
+  onToggleMaximize,
 }: {
   id: string;
   name: string;
   src: string;
   aiStatus: string;
   hasDetectionBox?: boolean;
+  isMaximized?: boolean;
+  onToggleMaximize?: () => void;
 }) {
   return (
     <div
@@ -246,9 +276,50 @@ function MockCamera({
       />
       <div className="cam-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
       <div className="target-bracket-tl" />
-      <div className="target-bracket-tr" />
+      {!onToggleMaximize && <div className="target-bracket-tr" />}
       <div className="target-bracket-bl" />
       <div className="target-bracket-br" />
+
+      {/* Top-Right: Maximize/Minimize Control */}
+      {onToggleMaximize && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            padding: '3px 6px',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-sm)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            zIndex: 10,
+          }}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleMaximize();
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '2px',
+              transition: 'color var(--transition-fast)',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
+            title={isMaximized ? 'Minimize' : 'Maximize'}
+          >
+            {isMaximized ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
+          </button>
+        </div>
+      )}
 
       {/* Top Label */}
       <div

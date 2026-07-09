@@ -121,10 +121,14 @@ class FireIntelligenceService:
                     observed_behaviour = "Persistent Detection"
             elif num_detections >= 3:
                 observed_behaviour = "Multiple Fire Regions"
-            elif detection_type == "smoke" and confidence >= 0.80:
-                observed_behaviour = "Dense Smoke"
+            elif detection_type == "fire_and_smoke":
+                observed_behaviour = "Active Fire & Smoke"
+            elif detection_type == "fire":
+                observed_behaviour = "Established Flame" if confidence >= 0.80 else "Active Combustion"
+            elif detection_type == "smoke":
+                observed_behaviour = "Dense Smoke" if confidence >= 0.80 else "Localized Smoke"
             else:
-                observed_behaviour = "Insufficient Data"
+                observed_behaviour = "Active Signal"
 
             # 5. Explainability Bullet Points (Newline separated)
             explanations = []

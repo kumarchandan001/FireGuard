@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { Flame } from 'lucide-react';
+import { Flame, Maximize2, Minimize2 } from 'lucide-react';
 import type { Detection, AlarmStatus } from '../../types';
 import { apiClient } from '../../api/client';
 import HoldButton from '../shared/HoldButton';
@@ -23,11 +23,14 @@ interface VideoFeedProps {
   alarmStatus?: AlarmStatus | null;
   onAcknowledge?: () => void;
   onDismiss?: () => void;
+  isMaximized?: boolean;
+  onToggleMaximize?: () => void;
 }
 
 export default function VideoFeed({
   frame, fps, detections, cameraOnline, isAlert,
   alarmStatus, onAcknowledge, onDismiss,
+  isMaximized = false, onToggleMaximize,
 }: VideoFeedProps) {
   const [toggling, setToggling] = useState(false);
   const [time, setTime] = useState(new Date());
@@ -134,11 +137,41 @@ export default function VideoFeed({
         </div>
       )}
 
-      {/* Top-Right: Timestamp */}
-      <div style={{ ...hudCorner, top: 8, right: 10 }}>
+      {/* Top-Right: Timestamp & Maximize/Minimize */}
+      <div style={{ ...hudCorner, top: 8, right: 10, display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span style={{ color: 'var(--text-secondary)' }}>
           {timestamp}
         </span>
+        {onToggleMaximize && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleMaximize();
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '2px',
+              borderRadius: 'var(--radius-sm)',
+              transition: 'color var(--transition-fast), background-color var(--transition-fast)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--accent)';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--text-secondary)';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+            title={isMaximized ? 'Minimize' : 'Maximize'}
+          >
+            {isMaximized ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+          </button>
+        )}
       </div>
 
       {/* ── Feed Footer Bar ──────────────────────────── */}
